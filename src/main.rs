@@ -764,6 +764,29 @@ async fn main() -> anyhow::Result<()> {
                 .layer(PropagateRequestIdLayer::x_request_id()),
         );
 
+    let rate_limit_config = std::sync::Arc::new(crate::middleware::rate_limit::RateLimitConfig::load("rate_limits.yaml").unwrap_or_else(|e| {
+        tracing::warn!("Failed to load rate_limits.yaml, using defaults: {}", e);
+        crate::middleware::rate_limit::RateLimitConfig {
+            endpoints: std::collections::HashMap::new(),
+            default: crate::middleware::rate_limit::EndpointLimits {
+                per_ip: Some(crate::middleware::rate_limit::LimitConfig { limit: 100, window: 60 }),
+                per_wallet: None,
+            }
+        }
+    }));
+
+    let app = if let Some(cache) = redis_cache.clone() {
+
+        let rate_limit_state = crate::middleware::rate_limit::RateLimitState {
+            cache: std::sync::Arc::new(cache),
+            config: rate_limit_config,
+        };
+        app.layer(axum::middleware::from_fn_with_state(rate_limit_state, crate::middleware::rate_limit::rate_limit_middleware))
+    } else {
+        app
+    };
+
+
     info!("✅ Routes configured");
 
     // Run the server with graceful shutdown
