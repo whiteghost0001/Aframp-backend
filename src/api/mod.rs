@@ -7,3 +7,6 @@ pub mod offramp_models;
 pub mod wallet;
 pub mod webhooks;
 pub mod auth;
+pub mod openapi;
+pub mod admin;
+pub mod batch;
